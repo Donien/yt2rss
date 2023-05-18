@@ -1,0 +1,59 @@
+#!/usr/bin/python3
+
+import re
+import sys
+import requests
+
+
+# Helper class to keep a connection alive and search for feed urls
+class YTSession:
+    def __init__(self):
+        self.session = requests.Session()
+        self.session.cookies.set("CONSENT", "YES+1")
+        #self.session.cookies.set("CONSENT", "YES+1", domain="youtube.com")
+    
+    def get_rss_url(self, yt_url):
+        match       = None
+        try:
+            req         = self.session.get(yt_url)
+            page_source = req.text
+            re_search   = re.search('"rssUrl":"(.*?)"', page_source)
+            if re_search:
+                match   = re_search.groups()[0]
+        except requests.exceptions.MissingSchema as error_msg:
+            print(f"Skipping URL '{yt_url}' ->", error_msg, file=sys.stderr)
+        return match
+
+
+def main():
+    ### Parsing
+    # Decide on either cli arguments or stdin
+    urls = list()
+
+    # CLI
+    if sys.argv[1:]:
+        urls = sys.argv[1:]
+
+    # STDIN
+    # Treat all newlines and spaces as separators
+    else:
+        for line in sys.stdin:
+            if " " in line.strip():
+                for line_item in line.strip().split(" "):
+                    urls.append(line_item)
+            else:
+                urls.append(line.strip())
+
+    ### Main loop
+    ytsession = YTSession()
+    for url in urls:
+        feed_url = ytsession.get_rss_url(url)
+        if feed_url:
+            print(feed_url)
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        print()
+        sys.exit(130)
